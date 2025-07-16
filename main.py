@@ -9,6 +9,21 @@ from discord import app_commands, Interaction, ButtonStyle
 from discord.ui import View, Button, Select
 import asyncio
 
+from threading import Thread
+from flask import Flask
+
+app = Flask(__name__)
+
+@app.route("/")
+def home():
+    return "Gundam Elo Bot is running!", 200
+
+def run_web():
+    app.run(host="0.0.0.0", port=8080)
+
+Thread(target=run_web).start()
+
+
 RANK_EMOJIS = {
     "Master": "<:Rank_Master:1395022666611691610>",
     "Diamond": "<:Rank_Diamond:1395022649700384868>",
