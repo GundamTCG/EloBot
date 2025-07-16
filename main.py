@@ -41,7 +41,8 @@ if not TOKEN:
 
 # ----------- Bot Setup -----------
 intents = discord.Intents.default()
-intents.members = True 
+intents.members = True
+intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 ALLOWED_MATCH_CHANNELS = ["1v1", "1v1test", "2v2"]
