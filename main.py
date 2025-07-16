@@ -1,6 +1,5 @@
 import os
 from dotenv import load_dotenv
-from keep_alive import keep_alive
 from database import initialize, get_player, update_stats, ensure_player_exists
 import aiosqlite
 
@@ -467,5 +466,4 @@ async def reset_elo(interaction: Interaction, user: discord.User, mode: app_comm
 
 # ----------- Run -----------
 
-keep_alive()
 bot.run(TOKEN)
