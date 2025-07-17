@@ -8,7 +8,6 @@ from discord.ui import View, Button, Select
 import asyncio
 import aiosqlite
 from database import initialize, get_player, update_stats, ensure_player_exists, save_match, remove_match, get_active_matches
-from utils import get_rank_info  # assume you have a utils.py for rank images/labels
 
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
