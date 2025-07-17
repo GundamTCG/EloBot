@@ -390,12 +390,17 @@ async def on_ready():
         if message_id:
             for guild in bot.guilds:
                 for channel in guild.text_channels:
-                    try:
-                        old_msg = await channel.fetch_message(message_id)
-                        await old_msg.delete()
-                        break
-                    except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-                        continue
+                # Optional: skip channels not in allowed match channels
+                if channel.name not in ALLOWED_MATCH_CHANNELS:
+                    continue
+                try:
+                    old_msg = await channel.fetch_message(message_id)
+                    await old_msg.delete()
+                    break 
+                except discord.NotFound:
+                    break 
+                except (discord.Forbidden, discord.HTTPException):
+                    continue
 
         # Create new view and restore players
         view = MatchView(host_id, mode)
