@@ -1,7 +1,7 @@
 import aiosqlite
 
 async def initialize():
-    async with aiosqlite.connect("db.sqlite") as db:
+    async with aiosqlite.connect("/data/db.sqlite") as db:
         await db.execute("""
         CREATE TABLE IF NOT EXISTS players (
             id INTEGER PRIMARY KEY,
@@ -28,7 +28,7 @@ async def initialize():
         await db.commit()
 
 async def ensure_player_exists(player_id: int):
-    async with aiosqlite.connect("db.sqlite") as db:
+    async with aiosqlite.connect("/data/db.sqlite") as db:
         await db.execute(
             "INSERT OR IGNORE INTO players (id) VALUES (?)", (player_id,)
         )
@@ -36,7 +36,7 @@ async def ensure_player_exists(player_id: int):
 
 async def get_player(player_id: int, mode: str):
     await ensure_player_exists(player_id)
-    async with aiosqlite.connect("db.sqlite") as db:
+    async with aiosqlite.connect("/data/db.sqlite") as db:
         cursor = await db.execute(
             f"SELECT wins_{mode}, losses_{mode}, elo_{mode} FROM players WHERE id = ?",
             (player_id,)
@@ -48,7 +48,7 @@ async def update_stats(winner_id: int, loser_id: int, mode: str):
     await ensure_player_exists(winner_id)
     await ensure_player_exists(loser_id)
 
-    async with aiosqlite.connect("db.sqlite") as db:
+    async with aiosqlite.connect("/data/db.sqlite") as db:
         # Get current ELO
         winner_cursor = await db.execute(
             f"SELECT elo_{mode} FROM players WHERE id = ?", (winner_id,)
@@ -95,7 +95,7 @@ import json
 async def save_match(match_id, mode, host_id, players, teams, status, message_id=None):
     players_json = json.dumps(players)
     teams_json = json.dumps(teams) if teams else None
-    async with aiosqlite.connect("db.sqlite") as db:
+    async with aiosqlite.connect("/data/db.sqlite") as db:
         await db.execute("""
             INSERT OR REPLACE INTO matches (match_id, mode, host_id, players, teams, status, message_id)
             VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -104,12 +104,12 @@ async def save_match(match_id, mode, host_id, players, teams, status, message_id
 
 
 async def remove_match(match_id):
-    async with aiosqlite.connect("db.sqlite") as db:
+    async with aiosqlite.connect("/data/db.sqlite") as db:
         await db.execute("DELETE FROM matches WHERE match_id=?", (match_id,))
         await db.commit()
 
 async def get_active_matches():
-    async with aiosqlite.connect("db.sqlite") as db:
+    async with aiosqlite.connect("/data/db.sqlite") as db:
         cursor = await db.execute("SELECT match_id, mode, host_id, players, teams, status FROM matches WHERE status = 'active'")
         rows = await cursor.fetchall()
         matches = []
