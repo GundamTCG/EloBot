@@ -323,12 +323,6 @@ async def on_ready():
     app_commands.Choice(name="1v1", value="1v1"),
     app_commands.Choice(name="2v2", value="2v2"),
 ])
-@bot.tree.command(name="start_match", description="Start a ranked match")
-@app_commands.describe(mode="Choose between 1v1 or 2v2")
-@app_commands.choices(mode=[
-    app_commands.Choice(name="1v1", value="1v1"),
-    app_commands.Choice(name="2v2", value="2v2"),
-])
 async def start_match(interaction: Interaction, mode: app_commands.Choice[str]):
     channel = interaction.channel.name
     if channel not in ALLOWED_MATCH_CHANNELS:
