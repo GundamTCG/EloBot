@@ -74,6 +74,18 @@ class MatchView(View):
         if len(self.players) == self.max_players and not self.timer_active:
             self.timer_task = asyncio.create_task(self.start_match_timer())
 
+    async def reset_timer_if_needed(self):
+        if self.timer_task and self.timer_active:
+            self.timer_task.cancel()
+            try:
+                await self.timer_task
+            except asyncio.CancelledError:
+                pass
+            self.timer_task = None
+            self.timer_active = False
+            self.timer_remaining = 25
+
+    
     def format_message(self):
         if self.mode == "2v2":
             a = ', '.join(f"<@{uid}>" for uid in self.teams["Team A"])
@@ -115,9 +127,11 @@ class MatchView(View):
             for team in self.teams.values():
                 if user_id in team:
                     team.remove(user_id)
+
         await self.reset_timer_if_needed()
 
         if not self.players:
+            # Last player just left—delete everything and confirm, then return!
             if self.match_id in matches:
                 del matches[self.match_id]
             try:
@@ -127,15 +141,17 @@ class MatchView(View):
                 pass
             await remove_match(self.match_id)
             await interaction.response.send_message("Match ended, all players have left.", ephemeral=True)
-            return
+            return  # <-- This stops further processing!
 
+        # Otherwise, update the match as usual
         await save_match(
             match_id=self.match_id,
             mode=self.mode,
             host_id=self.host_id,
             players=self.players,
             teams=self.teams,
-            status="active"
+            status="active",
+            message_id=self.message.id if self.message else None
         )
 
         try:
@@ -145,6 +161,7 @@ class MatchView(View):
         except (discord.HTTPException, discord.NotFound):
             await interaction.response.send_message("Could not update match message, but you have left the match.", ephemeral=True)
 
+
     @discord.ui.button(label="Report Win", style=ButtonStyle.success)
     async def report_button(self, interaction: Interaction, button: Button):
         if interaction.user.id not in self.players:
@@ -152,13 +169,25 @@ class MatchView(View):
             return
 
         if self.timer_active:
-            await interaction.response.send_message("⏳ The match hasn't started yet. Please wait for the countdown to finish before reporting a win.", ephemeral=True)
+            await interaction.response.send_message(
+                "⏳ The match hasn't started yet. Please wait for the countdown to finish before reporting a win.",
+                ephemeral=True
+            )
+            return
+
+        # --- Prevent report if not enough players ---
+        if len(self.players) < self.max_players:
+            await interaction.response.send_message(
+                "⚠️ There are not enough players to report a win! If you want to end the match, simply leave.",
+                ephemeral=True
+            )
             return
 
         if self.mode == "2v2":
             await interaction.response.send_message("Select winning team:", view=TeamWinSelectView(self), ephemeral=True)
         else:
             await interaction.response.send_message("Select the winner:", view=WinnerSelectView(self, interaction), ephemeral=True)
+            
 # ------------------- Team Selection View -------------------
 class TeamSelectView(View):
     def __init__(self, match_view, user_id):
