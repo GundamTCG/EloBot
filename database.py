@@ -13,7 +13,6 @@ async def initialize():
             elo_2v2 INTEGER DEFAULT 1000
         )
         """)
-        # ADD THIS:
         await db.execute("""
         CREATE TABLE IF NOT EXISTS matches (
             match_id INTEGER PRIMARY KEY,
@@ -21,9 +20,11 @@ async def initialize():
             host_id INTEGER NOT NULL,
             players TEXT NOT NULL,
             teams TEXT,
-            status TEXT NOT NULL
+            status TEXT NOT NULL,
+            message_id INTEGER
         )
         """)
+
         await db.commit()
 
 async def ensure_player_exists(player_id: int):
