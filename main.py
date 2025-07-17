@@ -457,7 +457,7 @@ async def stats(interaction: Interaction, mode: app_commands.Choice[str]):
 ])
 async def leaderboard(interaction: Interaction, mode: app_commands.Choice[str]):
     mode_value = mode.value
-    async with aiosqlite.connect("db.sqlite") as db:
+    async with aiosqlite.connect("/data/db.sqlite") as db:
         cursor = await db.execute(f"""
             SELECT id, wins_{mode_value}, losses_{mode_value}, elo_{mode_value}
             FROM players
@@ -507,7 +507,7 @@ async def reset_elo(interaction: Interaction, user: discord.User, mode: app_comm
         return
     await ensure_player_exists(user.id)
     mode_suffix = mode.value
-    async with aiosqlite.connect("db.sqlite") as db:
+    async with aiosqlite.connect("/data/db.sqlite") as db:
         await db.execute(
             f"""UPDATE players SET
                     wins_{mode_suffix}=0,
