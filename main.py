@@ -91,18 +91,58 @@ class MatchView(View):
             await interaction.response.send_message("Choose a team:", view=TeamSelectView(self, interaction.user.id), ephemeral=True)
         else:
             self.players.append(interaction.user.id)
+            await save_match(
+                match_id=self.match_id,
+                mode=self.mode,
+                host_id=self.host_id,
+                players=self.players,
+                teams=self.teams,
+                status="active",
+                message_id=self.message.id if self.message else None
+            )
             await interaction.response.edit_message(content=self.format_message(), view=self)
             self.maybe_start_timer()
 
     @discord.ui.button(label="Leave Match", style=ButtonStyle.secondary)
     async def leave_button(self, interaction: Interaction, button: Button):
-        uid = interaction.user.id
-        if uid in self.players:
-            self.players.remove(uid)
-        for team in self.teams.values():
-            if uid in team:
-                team.remove(uid)
-        await interaction.response.edit_message(content=self.format_message(), view=self)
+        user_id = interaction.user.id
+        if user_id not in self.players:
+            await interaction.response.send_message("You’re not in this match.", ephemeral=True)
+            return
+        self.players.remove(user_id)
+        if self.mode == "2v2":
+            for team in self.teams.values():
+                if user_id in team:
+                    team.remove(user_id)
+
+        # If all players left, remove the match entirely
+        if len(self.players) == 0:
+            try:
+                if self.message:
+                    await self.message.delete()
+            except Exception:
+                pass
+            await remove_match(self.match_id)
+            if self.match_id in matches:
+                del matches[self.match_id]
+            await interaction.response.send_message("❌ You’ve left the match. Match has been canceled as no players remain.", ephemeral=True)
+            return
+
+        # Save changes after leave
+        await save_match(
+            match_id=self.match_id,
+            mode=self.mode,
+            host_id=self.host_id,
+            players=self.players,
+            teams=self.teams,
+            status="active",
+            message_id=self.message.id if self.message else None
+        )
+
+        # Update the match message and notify user
+        if self.message:
+            await self.message.edit(content=self.format_message(), view=self)
+        await interaction.response.send_message("👋 You’ve left the match.", ephemeral=True)
 
     @discord.ui.button(label="Report Win", style=ButtonStyle.success)
     async def report_button(self, interaction: Interaction, button: Button):
@@ -135,6 +175,17 @@ class TeamSelectView(View):
             return
         self.match_view.teams[team].append(self.user_id)
         self.match_view.players.append(self.user_id)
+
+        await save_match(
+            match_id=self.match_view.match_id,
+            mode=self.match_view.mode,
+            host_id=self.match_view.host_id,
+            players=self.match_view.players,
+            teams=self.match_view.teams,
+            status="active",
+            message_id=self.match_view.message.id if self.match_view.message else None
+        )
+
         await interaction.message.delete()
         await self.match_view.message.edit(content=self.match_view.format_message(), view=self.match_view)
         self.match_view.maybe_start_timer()
@@ -164,18 +215,16 @@ class TeamWinSelectView(View):
         for winner in self.match_view.teams[winning_team]:
             for loser in self.match_view.teams[losing_team]:
                 await update_stats(winner, loser, "2v2")
+        if self.match_view.message:
+            try:
+                await self.match_view.message.delete()
+            except (discord.Forbidden, discord.NotFound):
+                pass
         try:
             await interaction.message.delete()  # Dropdown
         except (discord.Forbidden, discord.NotFound):
             pass
-        if self.match_view.message:
-            try:
-                await interaction.response.edit_message(
-                    content="✅ Result submitted! Thank you.",
-                    view=None
-                )
-            except (discord.Forbidden, discord.NotFound):
-                pass
+        await interaction.followup.send("✅ Result submitted! Thank you.", ephemeral=True)
         if self.match_view.match_id in matches:
             del matches[self.match_view.match_id]
         await remove_match(self.match_view.match_id)
@@ -211,18 +260,19 @@ class WinnerSelectView(View):
         winner_id = int(self.select.values[0])
         loser_id = [uid for uid in self.match_view.players if uid != winner_id][0]
         await update_stats(winner_id, loser_id, "1v1")
-        await interaction.response.edit_message(
-            content="✅ Result submitted! Thank you.",
-            view=None
-        )
-        await remove_match(self.match_view.match_id)
-        if self.match_view.match_id in matches:
-            del matches[self.match_view.match_id]
         if self.match_view.message:
             try:
                 await self.match_view.message.delete()
             except (discord.Forbidden, discord.NotFound):
                 pass
+        try:
+            await interaction.message.delete()
+        except (discord.Forbidden, discord.NotFound):
+            pass
+        await interaction.followup.send("✅ Result submitted! Thank you.", ephemeral=True)
+        if self.match_view.match_id in matches:
+            del matches[self.match_view.match_id]
+        await remove_match(self.match_view.match_id)
 
 # ------------------- Bot Ready Event -------------------
 @bot.event
@@ -273,6 +323,12 @@ async def on_ready():
     app_commands.Choice(name="1v1", value="1v1"),
     app_commands.Choice(name="2v2", value="2v2"),
 ])
+@bot.tree.command(name="start_match", description="Start a ranked match")
+@app_commands.describe(mode="Choose between 1v1 or 2v2")
+@app_commands.choices(mode=[
+    app_commands.Choice(name="1v1", value="1v1"),
+    app_commands.Choice(name="2v2", value="2v2"),
+])
 async def start_match(interaction: Interaction, mode: app_commands.Choice[str]):
     channel = interaction.channel.name
     if channel not in ALLOWED_MATCH_CHANNELS:
@@ -288,7 +344,6 @@ async def start_match(interaction: Interaction, mode: app_commands.Choice[str]):
     await interaction.response.send_message(view.format_message(), view=view)
     sent = await interaction.original_response()
     view.message = sent
-    matches[host_id] = view
 
     await save_match(
         match_id=host_id,
@@ -299,6 +354,7 @@ async def start_match(interaction: Interaction, mode: app_commands.Choice[str]):
         status="active",
         message_id=sent.id
     )
+
 
 # ------------------- Stats Command -------------------
 @bot.tree.command(name="stats", description="View your ELO, wins, and losses")
