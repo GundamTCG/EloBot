@@ -9,6 +9,21 @@ import asyncio
 import aiosqlite
 from database import initialize, get_player, update_stats, ensure_player_exists, save_match, remove_match, get_active_matches
 
+from threading import Thread
+from flask import Flask
+
+app = Flask(__name__)
+
+@app.route("/")
+def home():
+    return "Gundam Elo Bot is running!", 200
+
+def run_web():
+    app.run(host="0.0.0.0", port=8080)
+
+Thread(target=run_web).start()
+
+
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
 intents = discord.Intents.default()
