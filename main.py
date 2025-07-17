@@ -374,16 +374,40 @@ class WinnerSelectView(View):
 async def on_ready():
     print(f"✅ Logged in as {bot.user}")
     await initialize()
-    # --- NEW: Load from DB ---
+
     active = await get_active_matches()
-    for match in active:
-        # You may need to recreate MatchView objects if you want buttons/UI to work on restart.
-        matches[match["match_id"]] = match
+    for match_data in active:
+        match_id = match_data["match_id"]
+        host_id = match_data["host_id"]
+        mode = match_data["mode"]
+        players = match_data["players"]
+        teams = match_data["teams"]
+        message_id = match_data["message_id"]
+
+        # Recreate the MatchView
+        view = MatchView(host_id, mode)
+        view.players = players
+        view.teams = teams if teams else {}
+        view.match_id = match_id
+
+        # Retrieve message and attach view to it
+        for channel in bot.get_all_channels():
+            if isinstance(channel, discord.TextChannel):
+                try:
+                    message = await channel.fetch_message(message_id)
+                    view.message = message
+                    bot.add_view(view, message_id=message_id)
+                    matches[match_id] = view
+                    break
+                except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                    continue
+
     try:
         synced = await bot.tree.sync()
         print(f"🔄 Synced {len(synced)} commands.")
     except Exception as e:
         print("Sync error:", e)
+
         
 @bot.tree.command(name="start_match", description="Start a ranked match")
 @app_commands.describe(mode="Choose between 1v1 or 2v2")
@@ -404,18 +428,22 @@ async def start_match(interaction: Interaction, mode: app_commands.Choice[str]):
     matches[host_id] = view
 
 
+    await interaction.response.send_message(view.format_message(), view=view)
+    sent = await interaction.original_response()
+    view.message = sent
+    matches[host_id] = view
+
+    # Save match with message ID
     await save_match(
         match_id=host_id,
         mode=mode.value,
         host_id=host_id,
         players=view.players,
         teams=view.teams,
-        status="active"
+        status="active",
+        message_id=sent.id
     )
 
-    await interaction.response.send_message(view.format_message(), view=view)
-    sent = await interaction.original_response()
-    view.message = sent
 
 
 @bot.tree.command(name="stats", description="View your ELO, wins, and losses")
