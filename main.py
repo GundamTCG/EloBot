@@ -129,15 +129,15 @@ class MatchView(View):
             return
 
         # Save changes after leave
-        await save_match(
-            match_id=self.match_id,
-            mode=self.mode,
-            host_id=self.host_id,
-            players=self.players,
-            teams=self.teams,
-            status="active",
-            message_id=self.message.id if self.message else None
-        )
+            await save_match(
+                match_id=self.match_id,
+                mode=self.mode,
+                host_id=self.host_id,
+                players=self.players,
+                teams=self.teams,
+                status="active",
+                message_id=self.message.id if self.message else None
+            )
 
         # Update the match message and notify user
         if self.message:
