@@ -360,13 +360,26 @@ async def on_ready():
         mode = match_data["mode"]
         players = match_data["players"]
         teams = match_data["teams"] or {}
+        message_id = match_data.get("message_id")
 
+        # Try to delete the old match message
+        if message_id:
+            for guild in bot.guilds:
+                for channel in guild.text_channels:
+                    try:
+                        old_msg = await channel.fetch_message(message_id)
+                        await old_msg.delete()
+                        break
+                    except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                        continue
+
+        # Create new view and restore players
         view = MatchView(host_id, mode)
         view.players = players
         view.teams = teams
         view.match_id = match_id
 
-        # Find the correct channel to post new message
+        # Post a new message in a valid match channel
         for guild in bot.guilds:
             for channel in guild.text_channels:
                 if channel.name in ALLOWED_MATCH_CHANNELS:
@@ -375,8 +388,7 @@ async def on_ready():
                         view.message = sent
                         matches[match_id] = view
 
-                        # Save new message_id to DB
-                        from database import save_match
+                        # Save new message ID
                         await save_match(
                             match_id=match_id,
                             mode=mode,
@@ -387,9 +399,10 @@ async def on_ready():
                             message_id=sent.id
                         )
                         break
-                    except Exception as e:
-                        print(f"Failed to send new match message: {e}")
-                    break  # Stop after first valid channel
+                    except Exception:
+                        continue
+            if match_id in matches:
+                break
 
     try:
         synced = await bot.tree.sync()
