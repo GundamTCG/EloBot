@@ -19,6 +19,32 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 ALLOWED_MATCH_CHANNELS = ["1v1", "1v1test", "2v2"]
 matches = {}
 
+# ------------------- Rank Emojis -------------------
+RANK_EMOJIS = {
+    "Master": "<:Rank_Master:1395022666611691610>",
+    "Diamond": "<:Rank_Diamond:1395022649700384868>",
+    "Platinum": "<:Rank_Plat:1395022636903563365>",
+    "Gold": "<:Rank_Gold:1395022614937997343>",
+    "Silver": "<:Rank_Silver:1395022579827343400>",
+    "Bronze": "<:Rank_Bronze:1395022552346136627>",
+}
+
+# ------------------- Rank Info Function -------------------
+def get_rank_info(elo: int) -> tuple[str, str, str]:
+    if elo < 800:
+        return "Bronze", RANK_EMOJIS["Bronze"], "https://i.imgur.com/bTg35hk.png"
+    elif elo < 1000:
+        return "Silver", RANK_EMOJIS["Silver"], "https://i.imgur.com/MKggqhq.png"
+    elif elo < 1200:
+        return "Gold", RANK_EMOJIS["Gold"], "https://i.imgur.com/NEiM1M6.png"
+    elif elo < 1400:
+        return "Platinum", RANK_EMOJIS["Platinum"], "https://i.imgur.com/dOCTxJB.png"
+    elif elo < 1600:
+        return "Diamond", RANK_EMOJIS["Diamond"], "https://i.imgur.com/4yfiGqq.png"
+    else:
+        return "Master", RANK_EMOJIS["Master"], "https://i.imgur.com/EwMudQL.png"
+
+
 # ------------------- MatchView -------------------
 class MatchView(View):
     def __init__(self, host_id, game_mode):
