@@ -158,19 +158,25 @@ class MatchView(View):
         await self.reset_timer_if_needed()
 
         if not self.players:
-            # Last player just left—delete everything and confirm, then return!
+            # Last player just left — delete everything
             if self.match_id in matches:
                 del matches[self.match_id]
-            try:
-                if self.message:
-                    await self.message.delete()
-            except (discord.NotFound, discord.HTTPException):
-                pass
             await remove_match(self.match_id)
-            await interaction.response.send_message("Match ended, all players have left.", ephemeral=True)
-            return  # <-- This stops further processing!
 
-        # Otherwise, update the match as usual
+            if self.message:
+                try:
+                    await self.message.delete()
+                except (discord.NotFound, discord.HTTPException, discord.Forbidden):
+                    pass
+
+            try:
+                await interaction.response.send_message("Match ended, all players have left.", ephemeral=True)
+            except discord.InteractionResponded:
+                pass
+
+            return
+
+        # Update match in memory + DB
         await save_match(
             match_id=self.match_id,
             mode=self.mode,
@@ -181,12 +187,18 @@ class MatchView(View):
             message_id=self.message.id if self.message else None
         )
 
+        # Try updating the match message
         try:
             if self.message:
                 await self.message.edit(content=self.format_message(), view=self)
+        except (discord.NotFound, discord.HTTPException, discord.Forbidden):
+            pass
+
+        try:
             await interaction.response.send_message("You have left the match.", ephemeral=True)
-        except (discord.HTTPException, discord.NotFound):
-            await interaction.response.send_message("Could not update match message, but you have left the match.", ephemeral=True)
+        except (discord.InteractionResponded, discord.HTTPException):
+            pass
+
 
 
     @discord.ui.button(label="Report Win", style=ButtonStyle.success)
