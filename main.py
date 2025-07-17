@@ -375,8 +375,8 @@ async def on_ready():
     print(f"✅ Logged in as {bot.user}")
     await initialize()
 
-    active = await get_active_matches()
-    for match_data in active:
+    active_matches = await get_active_matches()
+    for match_data in active_matches:
         match_id = match_data["match_id"]
         host_id = match_data["host_id"]
         mode = match_data["mode"]
@@ -384,29 +384,33 @@ async def on_ready():
         teams = match_data["teams"]
         message_id = match_data["message_id"]
 
-        # Recreate the MatchView
         view = MatchView(host_id, mode)
         view.players = players
         view.teams = teams if teams else {}
         view.match_id = match_id
 
-        # Retrieve message and attach view to it
-        for channel in bot.get_all_channels():
-            if isinstance(channel, discord.TextChannel):
+        # Find the channel and message to reattach the view
+        message_found = False
+        for guild in bot.guilds:
+            for channel in guild.text_channels:
                 try:
                     message = await channel.fetch_message(message_id)
                     view.message = message
                     bot.add_view(view, message_id=message_id)
                     matches[match_id] = view
-                    break
+                    message_found = True
+                    break  # Stop searching if found
                 except (discord.NotFound, discord.Forbidden, discord.HTTPException):
                     continue
+            if message_found:
+                break
 
     try:
         synced = await bot.tree.sync()
         print(f"🔄 Synced {len(synced)} commands.")
     except Exception as e:
         print("Sync error:", e)
+
 
         
 @bot.tree.command(name="start_match", description="Start a ranked match")
