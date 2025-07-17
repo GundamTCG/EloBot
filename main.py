@@ -111,13 +111,25 @@ class MatchView(View):
 
     @discord.ui.button(label="Join Match", style=ButtonStyle.primary)
     async def join_button(self, interaction: Interaction, button: Button):
-        if interaction.user.id in self.players:
+        user_id = interaction.user.id
+        if any(user_id in match.players for match in matches.values()):
+            await interaction.response.send_message(
+                "You're already in an active match. You must leave it before joining another.",
+                 ephemeral=True
+            )
+            return
+    
+        if user_id in self.players:
             await interaction.response.send_message("You've already joined!", ephemeral=True)
             return
         if self.mode == "2v2":
-            await interaction.response.send_message("Choose a team:", view=TeamSelectView(self, interaction.user.id), ephemeral=True)
+            await interaction.response.send_message(
+                "Choose a team:",
+                view=TeamSelectView(self, user_id),
+                ephemeral=True
+            )
         else:
-            self.players.append(interaction.user.id)
+            self.players.append(user_id)
             await save_match(
                 match_id=self.match_id,
                 mode=self.mode,
