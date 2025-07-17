@@ -301,6 +301,7 @@ async def start_match(interaction: Interaction, mode: app_commands.Choice[str]):
         message_id=sent.id
     )
 
+# ------------------- Stats Command -------------------
 @bot.tree.command(name="stats", description="View your ELO, wins, and losses")
 @app_commands.describe(mode="Choose a game mode")
 @app_commands.choices(mode=[
@@ -312,15 +313,15 @@ async def stats(interaction: Interaction, mode: app_commands.Choice[str]):
     wins, losses, elo = await get_player(user_id, mode.value)
     rank, rank_emoji, image_url = get_rank_info(elo)
 
+    description = (
+        f"{rank_emoji} **{rank}**\n"
+        f"**ELO:** {elo}\n"
+        f"**Wins:** {wins} | **Losses:** {losses}"
+    )
+
     embed = discord.Embed(
         title=f"Stats for {interaction.user.display_name}",
-        description=(
-            f"{rank_emoji} **{rank}**
-"
-            f"**ELO:** {elo}
-"
-            f"**Wins:** {wins} | **Losses:** {losses}"
-        ),
+        description=description,
         color=discord.Color.blue()
     )
     embed.set_thumbnail(url=image_url)
