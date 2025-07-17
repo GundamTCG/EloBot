@@ -103,54 +103,62 @@ class MatchView(View):
             await interaction.response.edit_message(content=self.format_message(), view=self)
             self.maybe_start_timer()
 
-    @discord.ui.button(label="Leave Match", style=ButtonStyle.secondary)
+    @discord.ui.button(label="Leave Match", style=ButtonStyle.secondary, custom_id="leave", row=0)
     async def leave_button(self, interaction: Interaction, button: Button):
         user_id = interaction.user.id
         if user_id not in self.players:
-            await interaction.response.send_message("You’re not in this match.", ephemeral=True)
+            await interaction.response.send_message("You're not in this match.", ephemeral=True)
             return
+
         self.players.remove(user_id)
         if self.mode == "2v2":
             for team in self.teams.values():
                 if user_id in team:
                     team.remove(user_id)
+        await self.reset_timer_if_needed()
 
-        # If all players left, remove the match entirely
-        if len(self.players) == 0:
+        if not self.players:
+            if self.match_id in matches:
+                del matches[self.match_id]
             try:
                 if self.message:
                     await self.message.delete()
-            except Exception:
+            except (discord.NotFound, discord.HTTPException):
                 pass
             await remove_match(self.match_id)
-            if self.match_id in matches:
-                del matches[self.match_id]
-            await interaction.response.send_message("❌ You’ve left the match. Match has been canceled as no players remain.", ephemeral=True)
+            await interaction.response.send_message("Match ended, all players have left.", ephemeral=True)
             return
 
-        # Save changes after leave
-            await save_match(
-                match_id=self.match_id,
-                mode=self.mode,
-                host_id=self.host_id,
-                players=self.players,
-                teams=self.teams,
-                status="active",
-                message_id=self.message.id if self.message else None
-            )
+        await save_match(
+            match_id=self.match_id,
+            mode=self.mode,
+            host_id=self.host_id,
+            players=self.players,
+            teams=self.teams,
+            status="active"
+        )
 
-        # Update the match message and notify user
-        if self.message:
-            await self.message.edit(content=self.format_message(), view=self)
-        await interaction.response.send_message("👋 You’ve left the match.", ephemeral=True)
+        try:
+            if self.message:
+                await self.message.edit(content=self.format_message(), view=self)
+            await interaction.response.send_message("You have left the match.", ephemeral=True)
+        except (discord.HTTPException, discord.NotFound):
+            await interaction.response.send_message("Could not update match message, but you have left the match.", ephemeral=True)
 
     @discord.ui.button(label="Report Win", style=ButtonStyle.success)
     async def report_button(self, interaction: Interaction, button: Button):
+        if interaction.user.id not in self.players:
+            await interaction.response.send_message("You're not part of this match.", ephemeral=True)
+            return
+
+        if self.timer_active:
+            await interaction.response.send_message("⏳ The match hasn't started yet. Please wait for the countdown to finish before reporting a win.", ephemeral=True)
+            return
+
         if self.mode == "2v2":
             await interaction.response.send_message("Select winning team:", view=TeamWinSelectView(self), ephemeral=True)
         else:
             await interaction.response.send_message("Select the winner:", view=WinnerSelectView(self, interaction), ephemeral=True)
-
 # ------------------- Team Selection View -------------------
 class TeamSelectView(View):
     def __init__(self, match_view, user_id):
@@ -195,11 +203,14 @@ class TeamWinSelectView(View):
     def __init__(self, match_view):
         super().__init__(timeout=30)
         self.match_view = match_view
-        options = [
-            discord.SelectOption(label="Team A", value="Team A"),
-            discord.SelectOption(label="Team B", value="Team B")
-        ]
-        self.select = Select(placeholder="Select the winning team", options=options)
+        self.select = Select(
+            placeholder="Select the winning team",
+            options=[
+                discord.SelectOption(label="Team A (Blue/Green)", value="Team A"),
+                discord.SelectOption(label="Team B (Red/Yellow)", value="Team B")
+            ],
+            min_values=1, max_values=1
+        )
         self.select.callback = self.select_callback
         self.add_item(self.select)
 
@@ -210,24 +221,29 @@ class TeamWinSelectView(View):
         if len(self.match_view.players) < self.match_view.max_players:
             await interaction.response.send_message("⚠️ The match is not full. Please wait until all players join.", ephemeral=True)
             return
+
         winning_team = self.select.values[0]
         losing_team = "Team B" if winning_team == "Team A" else "Team A"
         for winner in self.match_view.teams[winning_team]:
             for loser in self.match_view.teams[losing_team]:
                 await update_stats(winner, loser, "2v2")
+
+        await interaction.response.edit_message(
+            content="✅ Result submitted! Thank you.",
+            view=None
+        )
+
+        # Delete the public match message for everyone else
         if self.match_view.message:
             try:
                 await self.match_view.message.delete()
             except (discord.Forbidden, discord.NotFound):
                 pass
-        try:
-            await interaction.message.delete()  # Dropdown
-        except (discord.Forbidden, discord.NotFound):
-            pass
-        await interaction.followup.send("✅ Result submitted! Thank you.", ephemeral=True)
+
+        # REMOVE MATCH FROM DB AND MEMORY
+        await remove_match(self.match_view.match_id)
         if self.match_view.match_id in matches:
             del matches[self.match_view.match_id]
-        await remove_match(self.match_view.match_id)
 
 # ------------------- Winner Select View -------------------
 class WinnerSelectView(View):
@@ -252,27 +268,40 @@ class WinnerSelectView(View):
 
     async def select_callback(self, interaction: Interaction):
         if self.match_view.timer_active:
-            await interaction.response.send_message("⏳ The match hasn't started yet. Please wait for the countdown to finish before reporting a win.", ephemeral=True)
+            await interaction.response.send_message(
+                "⏳ The match hasn't started yet. Please wait for the countdown to finish before reporting a win.",
+                ephemeral=True
+            )
             return
+
         if len(self.match_view.players) < 2:
-            await interaction.response.send_message("⚠️ A match must have at least two players to report a result.", ephemeral=True)
+            await interaction.response.send_message(
+                "⚠️ A match must have at least two players to report a result.",
+                ephemeral=True
+            )
             return
+
         winner_id = int(self.select.values[0])
         loser_id = [uid for uid in self.match_view.players if uid != winner_id][0]
+
         await update_stats(winner_id, loser_id, "1v1")
+
+        await interaction.response.edit_message(
+            content="✅ Result submitted! Thank you.",
+            view=None
+        )
+
+        # --- Remove match from DB and memory ---
+        await remove_match(self.match_view.match_id)
+        if self.match_view.match_id in matches:
+            del matches[self.match_view.match_id]
+
+        # Optionally delete the match message for everyone else
         if self.match_view.message:
             try:
                 await self.match_view.message.delete()
             except (discord.Forbidden, discord.NotFound):
                 pass
-        try:
-            await interaction.message.delete()
-        except (discord.Forbidden, discord.NotFound):
-            pass
-        await interaction.followup.send("✅ Result submitted! Thank you.", ephemeral=True)
-        if self.match_view.match_id in matches:
-            del matches[self.match_view.match_id]
-        await remove_match(self.match_view.match_id)
 
 # ------------------- Bot Ready Event -------------------
 @bot.event
