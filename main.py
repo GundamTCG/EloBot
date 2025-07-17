@@ -359,29 +359,37 @@ async def on_ready():
         host_id = match_data["host_id"]
         mode = match_data["mode"]
         players = match_data["players"]
-        teams = match_data["teams"]
-        message_id = match_data["message_id"]
+        teams = match_data["teams"] or {}
 
         view = MatchView(host_id, mode)
         view.players = players
-        view.teams = teams if teams else {}
+        view.teams = teams
         view.match_id = match_id
 
-        # Attempt to find the message to reattach the view
-        message_found = False
+        # Find the correct channel to post new message
         for guild in bot.guilds:
             for channel in guild.text_channels:
-                try:
-                    message = await channel.fetch_message(message_id)
-                    view.message = message
-                    bot.add_view(view, message_id=message_id)
-                    matches[match_id] = view
-                    message_found = True
-                    break
-                except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-                    continue
-            if message_found:
-                break
+                if channel.name in ALLOWED_MATCH_CHANNELS:
+                    try:
+                        sent = await channel.send(view.format_message(), view=view)
+                        view.message = sent
+                        matches[match_id] = view
+
+                        # Save new message_id to DB
+                        from database import save_match
+                        await save_match(
+                            match_id=match_id,
+                            mode=mode,
+                            host_id=host_id,
+                            players=players,
+                            teams=teams,
+                            status="active",
+                            message_id=sent.id
+                        )
+                        break
+                    except Exception as e:
+                        print(f"Failed to send new match message: {e}")
+                    break  # Stop after first valid channel
 
     try:
         synced = await bot.tree.sync()
