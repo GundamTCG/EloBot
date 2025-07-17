@@ -13,6 +13,17 @@ async def initialize():
             elo_2v2 INTEGER DEFAULT 1000
         )
         """)
+        # ADD THIS:
+        await db.execute("""
+        CREATE TABLE IF NOT EXISTS matches (
+            match_id INTEGER PRIMARY KEY,
+            mode TEXT NOT NULL,
+            host_id INTEGER NOT NULL,
+            players TEXT NOT NULL,
+            teams TEXT,
+            status TEXT NOT NULL
+        )
+        """)
         await db.commit()
 
 async def ensure_player_exists(player_id: int):
@@ -77,3 +88,38 @@ async def update_stats(winner_id: int, loser_id: int, mode: str):
         )
 
         await db.commit()
+
+import json
+
+async def save_match(match_id, mode, host_id, players, teams, status):
+    players_json = json.dumps(players)
+    teams_json = json.dumps(teams) if teams else None
+    async with aiosqlite.connect("db.sqlite") as db:
+        await db.execute("""
+            INSERT OR REPLACE INTO matches (match_id, mode, host_id, players, teams, status)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (match_id, mode, host_id, players_json, teams_json, status))
+        await db.commit()
+
+async def remove_match(match_id):
+    async with aiosqlite.connect("db.sqlite") as db:
+        await db.execute("DELETE FROM matches WHERE match_id=?", (match_id,))
+        await db.commit()
+
+async def get_active_matches():
+    async with aiosqlite.connect("db.sqlite") as db:
+        cursor = await db.execute("SELECT match_id, mode, host_id, players, teams, status FROM matches WHERE status = 'active'")
+        rows = await cursor.fetchall()
+        matches = []
+        for row in rows:
+            match = {
+                "match_id": row[0],
+                "mode": row[1],
+                "host_id": row[2],
+                "players": json.loads(row[3]),
+                "teams": json.loads(row[4]) if row[4] else None,
+                "status": row[5]
+            }
+            matches.append(match)
+        return matches
+
