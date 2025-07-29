@@ -25,6 +25,8 @@ def run_web():
 
 Thread(target=run_web).start()
 
+print("🔔 main.py loaded – this is the updated version!")
+
 
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
@@ -483,6 +485,7 @@ async def admin_report(
         )
 
 
+print("🔔 about to call bot.run()")
 
 
 
