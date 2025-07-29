@@ -493,11 +493,6 @@ print("🔔 about to call bot.run()")
 
 
 # ------------------- Bot Ready Event -------------------
-from discord import Object
-from database import get_active_matches
-# make sure you import your MatchView class and the in-memory dict
-from elo_bot import bot, matches, MatchView  
-
 @bot.event
 async def on_ready():
     # 1) sanity‐check
