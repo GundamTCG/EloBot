@@ -121,7 +121,9 @@ async def get_active_matches():
                 "host_id": row[2],
                 "players": json.loads(row[3]),
                 "teams": json.loads(row[4]) if row[4] else None,
-                "status": row[5]
+                "status": row[5],
+                "message_id": row[6],
+                "channel_id": row[7]
             }
             matches.append(match)
         return matches
