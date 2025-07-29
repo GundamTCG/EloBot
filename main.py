@@ -492,54 +492,51 @@ async def on_ready():
     print(f"✅ Logged in as {bot.user}")
     await initialize()
 
-    active_matches = await get_active_matches()
-    for match_data in active_matches:
-        match_id = match_data["match_id"]
-        host_id = match_data["host_id"]
-        mode = match_data["mode"]
-        players = match_data["players"]
-        teams = match_data["teams"] or {}
-        message_id = match_data.get("message_id")
-        channel_id = match_data.get("channel_id")  # ✅ must be in get_active_matches()
-
-        # Skip if message or channel info is missing
-        if not message_id or not channel_id:
-            await remove_match(match_id)
-            continue
-
-        # Find the correct channel
-        channel = None
-        for guild in bot.guilds:
-            chan = discord.utils.get(guild.text_channels, id=channel_id)
-            if chan:
-                channel = chan
-                break
-
-        if not channel:
-            await remove_match(match_id)
-            continue
-
-        # Try to fetch the original message
-        try:
-            message = await channel.fetch_message(message_id)
-
-            # Rebuild match view and reattach to message
-            view = MatchView(host_id, mode)
-            view.players = players
-            view.teams = teams
-            view.match_id = match_id
-            view.message = message
-
-            bot.add_view(view, message_id=message_id)
-            matches[match_id] = view
-
-        except discord.NotFound:
-            # Message was deleted — remove match from DB
-            await remove_match(match_id)
-
-        except (discord.NotFound, discord.HTTPException):
-            await remove_match(match_id)  # 🧹 Clean up broken match
-            continue
+    # TEMP: Commented out match restore until channel_id column exists
+    # try:
+    #     active_matches = await get_active_matches()
+    #     for match_data in active_matches:
+    #         match_id = match_data["match_id"]
+    #         host_id = match_data["host_id"]
+    #         mode = match_data["mode"]
+    #         players = match_data["players"]
+    #         teams = match_data["teams"] or {}
+    #         message_id = match_data.get("message_id")
+    #         channel_id = match_data.get("channel_id")
+    #
+    #         if not message_id or not channel_id:
+    #             await remove_match(match_id)
+    #             continue
+    #
+    #         channel = None
+    #         for guild in bot.guilds:
+    #             chan = discord.utils.get(guild.text_channels, id=channel_id)
+    #             if chan:
+    #                 channel = chan
+    #                 break
+    #
+    #         if not channel:
+    #             await remove_match(match_id)
+    #             continue
+    #
+    #         try:
+    #             message = await channel.fetch_message(message_id)
+    #             view = MatchView(host_id, mode)
+    #             view.players = players
+    #             view.teams = teams
+    #             view.match_id = match_id
+    #             view.message = message
+    #
+    #             bot.add_view(view, message_id=message_id)
+    #             matches[match_id] = view
+    #
+    #         except discord.NotFound:
+    #             await remove_match(match_id)
+    #         except (discord.HTTPException, discord.Forbidden):
+    #             await remove_match(match_id)
+    #
+    # except Exception as e:
+    #     print(f"[on_ready] Failed to reload matches: {e}")
 
     try:
         synced = await bot.tree.sync()
