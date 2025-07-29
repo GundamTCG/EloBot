@@ -264,7 +264,7 @@ class TeamSelectView(View):
             players=self.match_view.players,
             teams=self.match_view.teams,
             status="active",
-            message_id=self.message.id,
+            message_id=self.match_view.message.id,
             channel_id=interaction.channel.id
         )
 
