@@ -25,8 +25,6 @@ def run_web():
 
 Thread(target=run_web).start()
 
-print("🔔 main.py loaded – this is the updated version!")
-
 
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
@@ -142,7 +140,7 @@ class MatchView(View):
                 players=self.players,
                 teams=self.teams,
                 status="active",
-                message_id=sent.id,
+                message_id=self.message.id,
                 channel_id=interaction.channel.id
             )
             await interaction.response.edit_message(content=self.format_message(), view=self)
@@ -190,7 +188,7 @@ class MatchView(View):
             players=self.players,
             teams=self.teams,
             status="active",
-            message_id=sent.id,
+            message_id=self.message.id,
             channel_id=interaction.channel.id
         )
 
@@ -266,7 +264,7 @@ class TeamSelectView(View):
             players=self.match_view.players,
             teams=self.match_view.teams,
             status="active",
-            message_id=sent.id,
+            message_id=self.message.id,
             channel_id=interaction.channel.id
         )
 
@@ -487,11 +485,6 @@ async def admin_report(
             ephemeral=True
         )
 
-
-print("🔔 about to call bot.run()")
-
-
-
 # ------------------- Bot Ready Event -------------------
 @bot.event
 async def on_ready():
@@ -565,7 +558,7 @@ async def start_match(interaction: Interaction, mode: app_commands.Choice[str]):
         players=view.players,
         teams=view.teams,
         status="active",
-        message_id=sent.id,
+        message_id=self.message.id,
         channel_id=interaction.channel.id
     )
 
