@@ -373,6 +373,7 @@ class WinnerSelectView(View):
 
 # ------------------- Bot Ready Event -------------------
 @bot.event
+@bot.event
 async def on_ready():
     print(f"✅ Logged in as {bot.user}")
     await initialize()
@@ -385,59 +386,53 @@ async def on_ready():
         players = match_data["players"]
         teams = match_data["teams"] or {}
         message_id = match_data.get("message_id")
+        channel_id = match_data.get("channel_id")  # ✅ must be in get_active_matches()
 
-        # Try to delete the old match message
-        if message_id:
-            for guild in bot.guilds:
-                for channel in guild.text_channels:
-                # Optional: skip channels not in allowed match channels
-                    if channel.name not in ALLOWED_MATCH_CHANNELS:
-                        continue
-                    try:
-                        old_msg = await channel.fetch_message(message_id)
-                        await old_msg.delete()
-                        break 
-                    except discord.NotFound:
-                        break 
-                    except (discord.Forbidden, discord.HTTPException):
-                        continue
+        # Skip if message or channel info is missing
+        if not message_id or not channel_id:
+            await remove_match(match_id)
+            continue
 
-        # Create new view and restore players
-        view = MatchView(host_id, mode)
-        view.players = players
-        view.teams = teams
-        view.match_id = match_id
-
-        # Post a new message in a valid match channel
+        # Find the correct channel
+        channel = None
         for guild in bot.guilds:
-            for channel in guild.text_channels:
-                if channel.name in ALLOWED_MATCH_CHANNELS:
-                    try:
-                        sent = await channel.send(view.format_message(), view=view)
-                        view.message = sent
-                        matches[match_id] = view
-
-                        # Save new message ID
-                        await save_match(
-                            match_id=match_id,
-                            mode=mode,
-                            host_id=host_id,
-                            players=players,
-                            teams=teams,
-                            status="active",
-                            message_id=sent.id
-                        )
-                        break
-                    except Exception:
-                        continue
-            if match_id in matches:
+            chan = discord.utils.get(guild.text_channels, id=channel_id)
+            if chan:
+                channel = chan
                 break
+
+        if not channel:
+            await remove_match(match_id)
+            continue
+
+        # Try to fetch the original message
+        try:
+            message = await channel.fetch_message(message_id)
+
+            # Rebuild match view and reattach to message
+            view = MatchView(host_id, mode)
+            view.players = players
+            view.teams = teams
+            view.match_id = match_id
+            view.message = message
+
+            bot.add_view(view, message_id=message_id)
+            matches[match_id] = view
+
+        except discord.NotFound:
+            # Message was deleted — remove match from DB
+            await remove_match(match_id)
+
+        except (discord.NotFound, discord.HTTPException):
+            await remove_match(match_id)  # 🧹 Clean up broken match
+            continue
 
     try:
         synced = await bot.tree.sync()
         print(f"🔄 Synced {len(synced)} commands.")
     except Exception as e:
         print("Sync error:", e)
+
 
 # ------------------- Slash Commands -------------------
 @bot.tree.command(name="start_match", description="Start a ranked match")
@@ -469,7 +464,8 @@ async def start_match(interaction: Interaction, mode: app_commands.Choice[str]):
         players=view.players,
         teams=view.teams,
         status="active",
-        message_id=sent.id
+        message_id=sent.id,
+        channel_id=interaction.channel.id
     )
 
 
