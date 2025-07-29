@@ -1,5 +1,4 @@
-GUILD_ID = 1316829450234757130 
-TEST_GUILD = discord.Object(id=GUILD_ID)
+
 
 # ------------------- Imports and Setup -------------------
 import os
@@ -26,6 +25,8 @@ def run_web():
 
 Thread(target=run_web).start()
 
+GUILD_ID = 1316829450234757130 
+TEST_GUILD = discord.Object(id=GUILD_ID)
 
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
