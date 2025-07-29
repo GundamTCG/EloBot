@@ -142,7 +142,8 @@ class MatchView(View):
                 players=self.players,
                 teams=self.teams,
                 status="active",
-                message_id=self.message.id if self.message else None
+                message_id=sent.id,
+                channel_id=interaction.channel.id
             )
             await interaction.response.edit_message(content=self.format_message(), view=self)
             self.maybe_start_timer()
@@ -189,7 +190,8 @@ class MatchView(View):
             players=self.players,
             teams=self.teams,
             status="active",
-            message_id=self.message.id if self.message else None
+            message_id=sent.id,
+            channel_id=interaction.channel.id
         )
 
         # Try updating the match message
@@ -264,7 +266,8 @@ class TeamSelectView(View):
             players=self.match_view.players,
             teams=self.match_view.teams,
             status="active",
-            message_id=self.match_view.message.id if self.match_view.message else None
+            message_id=sent.id,
+            channel_id=interaction.channel.id
         )
 
         await interaction.message.delete()
@@ -490,18 +493,51 @@ print("🔔 about to call bot.run()")
 
 
 # ------------------- Bot Ready Event -------------------
+from discord import Object
+from database import get_active_matches
+# make sure you import your MatchView class and the in-memory dict
+from your_main_file import bot, matches, MatchView  
+
 @bot.event
 async def on_ready():
-    print(f"✅ Bot ready: Logged in as {bot.user} (ID: {bot.user.id})")
+    # 1) sanity‐check
+    print("🔔 main.py loaded – running updated code!")
     
+    # 2) sync global slash commands
     try:
-        # Force global sync
         synced = await bot.tree.sync()
         print(f"🔄 Synced {len(synced)} global commands:")
         for cmd in synced:
-            print(f" - /{cmd.name}")
+            print(f"   – /{cmd.name}")
     except Exception as e:
         print(f"❌ Slash command sync failed: {e}")
+    
+    # 3) rehydrate active matches from the database
+    print("♻️ Rehydrating active matches…")
+    rows = await get_active_matches()
+    for row in rows:
+        mv = MatchView(row["host_id"], row["mode"])
+        mv.match_id = row["match_id"]
+        mv.players  = row["players"]
+        mv.teams    = row["teams"] or {}
+        # fetch the original message so the buttons keep working
+        channel = bot.get_channel(row["channel_id"])
+        if channel:
+            try:
+                msg = await channel.fetch_message(row["message_id"])
+                mv.message = msg
+                # re-attach the view so the buttons are live again
+                await msg.edit(content=mv.format_message(), view=mv)
+                # if you had a running timer, you could restart it:
+                if mv.timer_remaining and mv.timer_active is False:
+                    mv.maybe_start_timer()
+            except Exception as e:
+                print(f"⚠️ Could not rehydrate match {mv.match_id}: {e}")
+        # store it back into memory
+        matches[mv.match_id] = mv
+
+    print("✅ on_ready complete – bot is fully up and running.")
+
 
 
 # ------------------- Slash Commands -------------------
@@ -534,7 +570,8 @@ async def start_match(interaction: Interaction, mode: app_commands.Choice[str]):
         players=view.players,
         teams=view.teams,
         status="active",
-        message_id=sent.id
+        message_id=sent.id,
+        channel_id=interaction.channel.id
     )
 
 
