@@ -1,3 +1,6 @@
+GUILD_ID = 1316829450234757130 
+TEST_GUILD = discord.Object(id=GUILD_ID)
+
 # ------------------- Imports and Setup -------------------
 import os
 from dotenv import load_dotenv
@@ -468,7 +471,7 @@ async def start_match(interaction: Interaction, mode: app_commands.Choice[str]):
         channel_id=interaction.channel.id
     )
 
-@bot.tree.command(name="reset_matches_table", description="Admin only: Fix matches table to add channel_id column")
+@bot.tree.command(name="reset_matches_table", guild=TEST_GUILD)
 async def reset_matches_table(interaction: Interaction):
     if interaction.user.id != 228719376415719426:  # Replace with your admin ID
         await interaction.response.send_message("🚫 You do not have permission.", ephemeral=True)
