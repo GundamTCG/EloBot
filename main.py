@@ -25,8 +25,6 @@ def run_web():
 
 Thread(target=run_web).start()
 
-GUILD_ID = 1316829450234757130 
-TEST_GUILD = discord.Object(id=GUILD_ID)
 
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
@@ -37,6 +35,9 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 ALLOWED_MATCH_CHANNELS = ["1v1", "1v1test", "2v2"]
 matches = {}
 
+
+GUILD_ID = 1316829450234757130 
+TEST_GUILD = discord.Object(id=GUILD_ID)
 # ------------------- Rank Emojis -------------------
 RANK_EMOJIS = {
     "Master": "<:Rank_Master:1395022666611691610>",
