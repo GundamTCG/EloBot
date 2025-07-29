@@ -371,88 +371,6 @@ class WinnerSelectView(View):
             except (discord.Forbidden, discord.NotFound):
                 pass
 
-# ------------------- Admin Manual Match Report -------------------
-
-@bot.tree.command(name="admin_report", description="Admin only: Manually report a match result")
-@app_commands.describe(
-    mode="Game mode",
-    player1="1v1: First player | 2v2: Team A Player 1",
-    player2="1v1: Second player | 2v2: Team A Player 2",
-    player3="2v2: Team B Player 1",
-    player4="2v2: Team B Player 2",
-    winner="Winner (1v1: Player 1 or Player 2 | 2v2: Team A or B)"
-)
-@app_commands.choices(mode=[
-    app_commands.Choice(name="1v1", value="1v1"),
-    app_commands.Choice(name="2v2", value="2v2"),
-])
-@app_commands.choices(winner=[
-    app_commands.Choice(name="Player 1 (1v1)", value="p1"),
-    app_commands.Choice(name="Player 2 (1v1)", value="p2"),
-    app_commands.Choice(name="Team A (2v2)", value="A"),
-    app_commands.Choice(name="Team B (2v2)", value="B"),
-])
-async def admin_report(
-    interaction: Interaction,
-    mode: app_commands.Choice[str],
-    player1: discord.User,
-    player2: discord.User,
-    winner: app_commands.Choice[str],
-    player3: discord.User = None,
-    player4: discord.User = None
-):
-    ADMIN_IDS = [228719376415719426]  # Replace with your real admin ID(s)
-    if interaction.user.id not in ADMIN_IDS:
-        await interaction.response.send_message("🚫 You do not have permission to use this command.", ephemeral=True)
-        return
-
-    mode_value = mode.value
-    winner_value = winner.value
-
-    if mode_value == "1v1":
-        # Handle 1v1 match
-        win_id = player1.id if winner_value == "p1" else player2.id
-        lose_id = player2.id if winner_value == "p1" else player1.id
-
-        await ensure_player_exists(win_id)
-        await ensure_player_exists(lose_id)
-        await update_stats(win_id, lose_id, "1v1")
-
-        await interaction.response.send_message(
-            f"✅ 1v1 match result recorded:\n**Winner:** <@{win_id}>\n**Loser:** <@{lose_id}>",
-            ephemeral=True
-        )
-
-    elif mode_value == "2v2":
-        if not (player3 and player4):
-            await interaction.response.send_message("⚠️ Please provide all four players for 2v2 mode.", ephemeral=True)
-            return
-
-        team_a = [player1.id, player2.id]
-        team_b = [player3.id, player4.id]
-
-        winners = team_a if winner_value == "A" else team_b
-        losers = team_b if winner_value == "A" else team_a
-
-        # Ensure all players exist
-        for uid in winners + losers:
-            await ensure_player_exists(uid)
-
-        # Apply ELO changes for all winner-loser pairs
-        for w in winners:
-            for l in losers:
-                await update_stats(w, l, "2v2")
-
-        a_mentions = f"<@{team_a[0]}> + <@{team_a[1]}>"
-        b_mentions = f"<@{team_b[0]}> + <@{team_b[1]}>"
-        win_team = a_mentions if winner_value == "A" else b_mentions
-
-        await interaction.response.send_message(
-            f"✅ 2v2 match result recorded:\n**Winning Team:** {win_team}",
-            ephemeral=True
-        )
-
-
 
 # ------------------- Bot Ready Event -------------------
 @bot.event
@@ -550,6 +468,88 @@ async def start_match(interaction: Interaction, mode: app_commands.Choice[str]):
         message_id=sent.id,
         channel_id=interaction.channel.id
     )
+
+# ------------------- Admin Manual Match Report -------------------
+@bot.tree.command(name="admin_report", description="Admin only: Manually report a match result")
+@app_commands.describe(
+    mode="Game mode",
+    player1="1v1: First player | 2v2: Team A Player 1",
+    player2="1v1: Second player | 2v2: Team A Player 2",
+    player3="2v2: Team B Player 1",
+    player4="2v2: Team B Player 2",
+    winner="Winner (1v1: Player 1 or Player 2 | 2v2: Team A or B)"
+)
+@app_commands.choices(mode=[
+    app_commands.Choice(name="1v1", value="1v1"),
+    app_commands.Choice(name="2v2", value="2v2"),
+])
+@app_commands.choices(winner=[
+    app_commands.Choice(name="Player 1 (1v1)", value="p1"),
+    app_commands.Choice(name="Player 2 (1v1)", value="p2"),
+    app_commands.Choice(name="Team A (2v2)", value="A"),
+    app_commands.Choice(name="Team B (2v2)", value="B"),
+])
+async def admin_report(
+    interaction: Interaction,
+    mode: app_commands.Choice[str],
+    player1: discord.User,
+    player2: discord.User,
+    winner: app_commands.Choice[str],
+    player3: discord.User = None,
+    player4: discord.User = None
+):
+    ADMIN_IDS = [228719376415719426]  # Replace with your real admin ID(s)
+    if interaction.user.id not in ADMIN_IDS:
+        await interaction.response.send_message("🚫 You do not have permission to use this command.", ephemeral=True)
+        return
+
+    mode_value = mode.value
+    winner_value = winner.value
+
+    if mode_value == "1v1":
+        # Handle 1v1 match
+        win_id = player1.id if winner_value == "p1" else player2.id
+        lose_id = player2.id if winner_value == "p1" else player1.id
+
+        await ensure_player_exists(win_id)
+        await ensure_player_exists(lose_id)
+        await update_stats(win_id, lose_id, "1v1")
+
+        await interaction.response.send_message(
+            f"✅ 1v1 match result recorded:\n**Winner:** <@{win_id}>\n**Loser:** <@{lose_id}>",
+            ephemeral=True
+        )
+
+    elif mode_value == "2v2":
+        if not (player3 and player4):
+            await interaction.response.send_message("⚠️ Please provide all four players for 2v2 mode.", ephemeral=True)
+            return
+
+        team_a = [player1.id, player2.id]
+        team_b = [player3.id, player4.id]
+
+        winners = team_a if winner_value == "A" else team_b
+        losers = team_b if winner_value == "A" else team_a
+
+        # Ensure all players exist
+        for uid in winners + losers:
+            await ensure_player_exists(uid)
+
+        # Apply ELO changes for all winner-loser pairs
+        for w in winners:
+            for l in losers:
+                await update_stats(w, l, "2v2")
+
+        a_mentions = f"<@{team_a[0]}> + <@{team_a[1]}>"
+        b_mentions = f"<@{team_b[0]}> + <@{team_b[1]}>"
+        win_team = a_mentions if winner_value == "A" else b_mentions
+
+        await interaction.response.send_message(
+            f"✅ 2v2 match result recorded:\n**Winning Team:** {win_team}",
+            ephemeral=True
+        )
+
+
 
 
 # ------------------- Stats Command -------------------
