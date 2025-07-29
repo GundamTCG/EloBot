@@ -374,103 +374,6 @@ class WinnerSelectView(View):
             except (discord.Forbidden, discord.NotFound):
                 pass
 
-
-# ------------------- Bot Ready Event -------------------
-@bot.event
-async def on_ready():
-    print(f"✅ Logged in as {bot.user}")
-    await initialize()
-
-    active_matches = await get_active_matches()
-    for match_data in active_matches:
-        match_id = match_data["match_id"]
-        host_id = match_data["host_id"]
-        mode = match_data["mode"]
-        players = match_data["players"]
-        teams = match_data["teams"] or {}
-        message_id = match_data.get("message_id")
-        channel_id = match_data.get("channel_id")  # ✅ must be in get_active_matches()
-
-        # Skip if message or channel info is missing
-        if not message_id or not channel_id:
-            await remove_match(match_id)
-            continue
-
-        # Find the correct channel
-        channel = None
-        for guild in bot.guilds:
-            chan = discord.utils.get(guild.text_channels, id=channel_id)
-            if chan:
-                channel = chan
-                break
-
-        if not channel:
-            await remove_match(match_id)
-            continue
-
-        # Try to fetch the original message
-        try:
-            message = await channel.fetch_message(message_id)
-
-            # Rebuild match view and reattach to message
-            view = MatchView(host_id, mode)
-            view.players = players
-            view.teams = teams
-            view.match_id = match_id
-            view.message = message
-
-            bot.add_view(view, message_id=message_id)
-            matches[match_id] = view
-
-        except discord.NotFound:
-            # Message was deleted — remove match from DB
-            await remove_match(match_id)
-
-        except (discord.NotFound, discord.HTTPException):
-            await remove_match(match_id)  # 🧹 Clean up broken match
-            continue
-
-    try:
-        synced = await bot.tree.sync()
-        print(f"🔄 Synced {len(synced)} commands.")
-    except Exception as e:
-        print("Sync error:", e)
-
-
-# ------------------- Slash Commands -------------------
-@bot.tree.command(name="start_match", description="Start a ranked match")
-@app_commands.describe(mode="Choose between 1v1 or 2v2")
-@app_commands.choices(mode=[
-    app_commands.Choice(name="1v1", value="1v1"),
-    app_commands.Choice(name="2v2", value="2v2"),
-])
-async def start_match(interaction: Interaction, mode: app_commands.Choice[str]):
-    channel = interaction.channel.name
-    if channel not in ALLOWED_MATCH_CHANNELS:
-        await interaction.response.send_message("You can only start matches in #1v1 or #2v2 channels.", ephemeral=True)
-        return
-    host_id = interaction.user.id
-    if any(host_id in match.players for match in matches.values()):
-        await interaction.response.send_message("You already have a match running!", ephemeral=True)
-        return
-    view = MatchView(host_id, mode.value)
-    matches[host_id] = view
-
-    await interaction.response.send_message(view.format_message(), view=view)
-    sent = await interaction.original_response()
-    view.message = sent
-
-    await save_match(
-        match_id=host_id,
-        mode=mode.value,
-        host_id=host_id,
-        players=view.players,
-        teams=view.teams,
-        status="active",
-        message_id=sent.id,
-        channel_id=interaction.channel.id
-    )
-
 @bot.tree.command(name="reset_matches_table", description="Fix the matches table")
 async def reset_matches_table(interaction: Interaction):
     if interaction.user.id != 228719376415719426:  # Replace with your admin ID
@@ -579,6 +482,105 @@ async def admin_report(
             ephemeral=True
         )
 
+
+
+
+
+# ------------------- Bot Ready Event -------------------
+@bot.event
+async def on_ready():
+    print(f"✅ Logged in as {bot.user}")
+    await initialize()
+
+    active_matches = await get_active_matches()
+    for match_data in active_matches:
+        match_id = match_data["match_id"]
+        host_id = match_data["host_id"]
+        mode = match_data["mode"]
+        players = match_data["players"]
+        teams = match_data["teams"] or {}
+        message_id = match_data.get("message_id")
+        channel_id = match_data.get("channel_id")  # ✅ must be in get_active_matches()
+
+        # Skip if message or channel info is missing
+        if not message_id or not channel_id:
+            await remove_match(match_id)
+            continue
+
+        # Find the correct channel
+        channel = None
+        for guild in bot.guilds:
+            chan = discord.utils.get(guild.text_channels, id=channel_id)
+            if chan:
+                channel = chan
+                break
+
+        if not channel:
+            await remove_match(match_id)
+            continue
+
+        # Try to fetch the original message
+        try:
+            message = await channel.fetch_message(message_id)
+
+            # Rebuild match view and reattach to message
+            view = MatchView(host_id, mode)
+            view.players = players
+            view.teams = teams
+            view.match_id = match_id
+            view.message = message
+
+            bot.add_view(view, message_id=message_id)
+            matches[match_id] = view
+
+        except discord.NotFound:
+            # Message was deleted — remove match from DB
+            await remove_match(match_id)
+
+        except (discord.NotFound, discord.HTTPException):
+            await remove_match(match_id)  # 🧹 Clean up broken match
+            continue
+
+    try:
+        synced = await bot.tree.sync()
+        print(f"🔄 Synced {len(synced)} commands.")
+    except Exception as e:
+        print("Sync error:", e)
+
+
+# ------------------- Slash Commands -------------------
+@bot.tree.command(name="start_match", description="Start a ranked match")
+@app_commands.describe(mode="Choose between 1v1 or 2v2")
+@app_commands.choices(mode=[
+    app_commands.Choice(name="1v1", value="1v1"),
+    app_commands.Choice(name="2v2", value="2v2"),
+])
+async def start_match(interaction: Interaction, mode: app_commands.Choice[str]):
+    channel = interaction.channel.name
+    if channel not in ALLOWED_MATCH_CHANNELS:
+        await interaction.response.send_message("You can only start matches in #1v1 or #2v2 channels.", ephemeral=True)
+        return
+    host_id = interaction.user.id
+    if any(host_id in match.players for match in matches.values()):
+        await interaction.response.send_message("You already have a match running!", ephemeral=True)
+        return
+    view = MatchView(host_id, mode.value)
+    matches[host_id] = view
+
+    await interaction.response.send_message(view.format_message(), view=view)
+    sent = await interaction.original_response()
+    view.message = sent
+
+    await save_match(
+        match_id=host_id,
+        mode=mode.value,
+        host_id=host_id,
+        players=view.players,
+        teams=view.teams,
+        status="active",
+        message_id=sent.id,
+        channel_id=interaction.channel.id
+    )
 
 
 
