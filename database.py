@@ -93,15 +93,17 @@ async def update_stats(winner_id: int, loser_id: int, mode: str):
 
 import json
 
-async def save_match(match_id, mode, host_id, players, teams, status, message_id=None):
+async def save_match(match_id, mode, host_id, players, teams, status, message_id=None, channel_id=None):
     players_json = json.dumps(players)
     teams_json = json.dumps(teams) if teams else None
     async with aiosqlite.connect("/data/db.sqlite") as db:
         await db.execute("""
-            INSERT OR REPLACE INTO matches (match_id, mode, host_id, players, teams, status, message_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (match_id, mode, host_id, players_json, teams_json, status, message_id,channel_id))
+            INSERT OR REPLACE INTO matches (
+                match_id, mode, host_id, players, teams, status, message_id, channel_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (match_id, mode, host_id, players_json, teams_json, status, message_id, channel_id))
         await db.commit()
+
 
 
 async def remove_match(match_id):
