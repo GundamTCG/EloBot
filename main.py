@@ -548,14 +548,6 @@ async def admin_report(
             ephemeral=True
         )
 
-@bot.tree.command(name="resync_all", description="Clear and resync all slash commands (admin only)")
-async def resync_all(interaction: Interaction):
-    if interaction.user.id == 228719376415719426:
-        await bot.tree.clear_commands(guild=None)
-        synced = await bot.tree.sync()
-        await interaction.response.send_message(f"🧹 Cleared and resynced {len(synced)} commands.", ephemeral=True)
-    else:
-        await interaction.response.send_message("🚫 Not allowed.", ephemeral=True)
 
 
 
