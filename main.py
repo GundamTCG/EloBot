@@ -578,8 +578,7 @@ async def start_match(interaction: Interaction, mode: app_commands.Choice[str]):
         players=view.players,
         teams=view.teams,
         status="active",
-        message_id=sent.id,
-        channel_id=interaction.channel.id
+        message_id=sent.id
     )
 
 
