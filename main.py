@@ -36,8 +36,6 @@ ALLOWED_MATCH_CHANNELS = ["1v1", "1v1test", "2v2"]
 matches = {}
 
 
-GUILD_ID = 1316829450234757130 
-TEST_GUILD = discord.Object(id=GUILD_ID)
 # ------------------- Rank Emojis -------------------
 RANK_EMOJIS = {
     "Master": "<:Rank_Master:1395022666611691610>",
@@ -473,7 +471,7 @@ async def start_match(interaction: Interaction, mode: app_commands.Choice[str]):
         channel_id=interaction.channel.id
     )
 
-@bot.tree.command(name="reset_matches_table", guild=TEST_GUILD)
+@bot.tree.command(name="reset_matches_table", description="Fix the matches table")
 async def reset_matches_table(interaction: Interaction):
     if interaction.user.id != 228719376415719426:  # Replace with your admin ID
         await interaction.response.send_message("🚫 You do not have permission.", ephemeral=True)
