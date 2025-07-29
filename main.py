@@ -468,6 +468,34 @@ async def start_match(interaction: Interaction, mode: app_commands.Choice[str]):
         channel_id=interaction.channel.id
     )
 
+@bot.tree.command(name="reset_matches_table", description="Admin only: Fix matches table to add channel_id column")
+async def reset_matches_table(interaction: Interaction):
+    if interaction.user.id != 228719376415719426:  # Replace with your admin ID
+        await interaction.response.send_message("🚫 You do not have permission.", ephemeral=True)
+        return
+
+    try:
+        async with aiosqlite.connect("/data/db.sqlite") as db:
+            # Check if column exists already
+            cursor = await db.execute("PRAGMA table_info(matches)")
+            columns = await cursor.fetchall()
+            column_names = [col[1] for col in columns]
+
+            if "channel_id" in column_names:
+                await interaction.response.send_message("✅ channel_id column already exists. No reset needed.", ephemeral=True)
+                return
+
+            # Drop and recreate the table
+            await db.execute("DROP TABLE IF EXISTS matches")
+            await db.commit()
+            await initialize()
+
+        await interaction.response.send_message("✅ Matches table reset and upgraded with channel_id column.", ephemeral=True)
+
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Error resetting table: `{e}`", ephemeral=True)
+
+
 # ------------------- Admin Manual Match Report -------------------
 @bot.tree.command(name="admin_report", description="Admin only: Manually report a match result")
 @app_commands.describe(
