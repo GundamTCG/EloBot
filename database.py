@@ -21,7 +21,8 @@ async def initialize():
             players TEXT NOT NULL,
             teams TEXT,
             status TEXT NOT NULL,
-            message_id INTEGER
+            message_id INTEGER,
+            channel_id INTEGER
         )
         """)
 
@@ -99,7 +100,7 @@ async def save_match(match_id, mode, host_id, players, teams, status, message_id
         await db.execute("""
             INSERT OR REPLACE INTO matches (match_id, mode, host_id, players, teams, status, message_id)
             VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (match_id, mode, host_id, players_json, teams_json, status, message_id))
+        """, (match_id, mode, host_id, players_json, teams_json, status, message_id,channel_id))
         await db.commit()
 
 
@@ -110,7 +111,7 @@ async def remove_match(match_id):
 
 async def get_active_matches():
     async with aiosqlite.connect("/data/db.sqlite") as db:
-        cursor = await db.execute("SELECT match_id, mode, host_id, players, teams, status FROM matches WHERE status = 'active'")
+        cursor = await db.execute("SELECT match_id, mode, host_id, players, teams, status, message_id, channel_id FROM matches WHERE status = 'active'")
         rows = await cursor.fetchall()
         matches = []
         for row in rows:
